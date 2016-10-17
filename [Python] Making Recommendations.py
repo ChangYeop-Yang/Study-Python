@@ -87,17 +87,20 @@ def sim_pearson(prefs, p1, p2):
 # 매개변수 similarity = 유사도 함수 (sim_distance, sim_pearson), n = 동일한 사람 수 설정, prefs = 리스트 변수, person = 찾을 사람
 def topMatches(prefs, person, n=5, similarity=sim_pearson):
     scores = [(similarity(prefs, person, other), other)
-              for other in prefs if other != person]
+              for other in prefs if other != person] # don't compare me to myself
 
-    scores.sort()  # 정렬
-    scores.reverse()  # 순서 역순
+    scores.sort()
+    scores.reverse()
     return scores[0:n]
 
 
 # Gets recommendations for a person by using a weighted average
 # of every other user's rankings
 # 매개변수 similarity = 유사도 함수 (sim_distance, sim_pearson), prefs = 리스트 변수, person = 찾을 사람
-def getRecommendations(prefs, person, similarity=sim_pearson):  # 사용자 기반 협력 필터링은 추천할 때에도 유사성 계산을 함으로써 시간이 소비가 많다.
+def getRecommendations(prefs, person, similarity=sim_pearson):
+# - 사용자 기반 협력 필터링 방법 -
+# ⓐ 사용자들이 평가한 랭킹 정보 데이터가 있어야 한다. / ⓑ 큰 사이트에서는 느리게 동작한다.
+# ⓒ 많은 제품 보유 사이트에선 사용자간 중첩이 거의 없어 유사 판단이 어렵다.
 
     # Dictionary
     totals = {}
@@ -105,44 +108,43 @@ def getRecommendations(prefs, person, similarity=sim_pearson):  # 사용자 기�
 
     for other in prefs:
         if other == person: continue  # don't compare me to myself
-        sim = similarity(prefs, person, other)
+        # 사용자 기반 협력 필터링은 추천할 때에도 유사성 계산을 함으로써 시간이 소비가 많다.
+        sim = similarity(prefs, person, other) # 입력 받은 사람과 다른 사람들과의 유사성 계산
 
         # ignore scores of zero or lower
         if sim <= 0: continue
         for item in prefs[other]:
 
             # only score movies I haven't seen yet
+            # 아직 영화를 보지 않은 경우 또는 점수를 주지 않은 경우
             if item not in prefs[person] or prefs[person][item] == 0:
-                # 아직 영화를 보지 않은 경우 또는 점수를 주지 않은 경우
+                totals.setdefault(item, 0) # Product을 Key값으로 Dictionary 생성
+                totals[item] += prefs[other][item] * sim # Similarity(유사성) * Score(점수) 연산 한 값을 Product 총합 점수에 더한다.
 
-                # item을 Key값으로 자료구조 생성
-                totals.setdefault(item, 0)
-                # Similarity(유사성) * Score(점수)
-                totals[item] += prefs[other][item] * sim
-
-                # Sum of similarities (유사성에 합을 더함)
+                # Sum of similarities (동일 유사성에 합을 더함)
                 simSums.setdefault(item, 0)
                 simSums[item] += sim
 
     # Create the normalized list
     rankings = [(total / simSums[item], item) for item, total in totals.items()]
+    # 가중치 합계를 해당 영화를 리뷰한 모든 평론가들의 유사도의 합으로 나눈다.
 
     # Return the sorted list
-    rankings.sort()  # 정렬
-    rankings.reverse()  # 순서 역순
+    rankings.sort()
+    rankings.reverse()
     return rankings
 
 
 # Invert the preference matrix to be item-centric
-# 자료사전의 Key와 Value를 바꾸는 함수
+# Dictionary의 Key와 Value를 바꾸는 함수
 def transformPrefs(prefs):
     # Dictionary
     result = {}
 
     for person in prefs:
-        for item in prefs[person]:  # Value 값을 Key 값으로 변경
-            result.setdefault(item, {})
-
+        for item in prefs[person]:
+            result.setdefault(item, {}) # Value 값을 Key 값으로 변경하여 Dictionary 생성
+        # Flip item and Person
         result[item][person] = prefs[person][item]
 
     return result
@@ -150,7 +152,6 @@ def transformPrefs(prefs):
 
 # 항목기반 필터링(Item-Based Filtering)
 # 항목 기반 협력 필터링은 사전에 유사성 계산을 한 뒤 저장함으로써 추천 시에는 빠른 속도를 가진다.
-
 def calculateSimilarItems(prefs, n=10):
     # Create a dictionary of items showing which other items they
     # are most similar to.
@@ -159,25 +160,27 @@ def calculateSimilarItems(prefs, n=10):
     # Invert the preference matrix to be item-centric
     itemPrefs = transformPrefs(prefs)
 
+    # 단점 : 사용자수와 평가 수가 작을 경우는 자주 실행하여 시간을 많이 소비한다.
+    # 하지만 사용자수가 많아질수록 항목들 간 유사도 점수는 안정적이 된다.
     c = 0
     for item in itemPrefs:
         # Status updates for large datasets
         c += 1
 
-        if c % 100 == 0: print
-        "%d / %d" % (c, len(itemPrefs))
+        if c % 100 == 0: print ("%d / %d" % (c, len(itemPrefs)))
         # Find the most similar items to this one
 
+        # ⓐ 각 항목별로 가장 유사한 항목을 미리 계산한다. / ⓑ 항목간의 비교는 자주 바뀌지 않는다.
         scores = topMatches(itemPrefs, item, n=n, similarity=sim_distance)
         result[item] = scores
 
     return result
 
-
+# 사용자가 평가하였던 항목과 유사한 항목을 찾은 후, 그들간에 유사정도를 통해 가중치를 계산한다.
 def getRecommendedItems(prefs, itemMatch, user):
     # Dictionary
-    userRatings = prefs[user]
-    scores = {}
+    userRatings = prefs[user] # User의 Product 정보를 모두 userRatings 저장한다.
+    scores = {} # 점수를 저장하는 Dictionary
     totalSim = {}
 
     # Loop over items rated by this user
@@ -205,17 +208,6 @@ def getRecommendedItems(prefs, itemMatch, user):
     rankings.reverse()
     return rankings
 
-def loadMovieLens(path='C:\Users\user\Desktop\data'):
-  # Get movie titles
-  movies={}
-  for line in open(path+'\u.item'):
-    (id,title)=line.split('|')[0:2]
-    movies[id]=title
-
-# Load data
-  prefs={}
-  for line in open(path+'\u.data'):
-    (user,movieid,rating,ts)=line.split('\t')
-    prefs.setdefault(user,{})
-    prefs[user][movies[movieid]]=float(rating)
-  return prefs
+# 사용자 기반 필터링와 항목기반 필터링 비교
+# ⓐ 사용자 기반 필터링 : 구현 용이, 추가 단계 없음 / 자주 변경되는 작은 데이터 세트에 적합
+# ⓑ 항목 기반 필터링 : 큰 데이터 세트인 경우 훨씬 빠름 / 항목 유사도 테이블 유지 위한 추가 부담 / 희박한 데이터 세트인 경우 더 잘 동작 / 조밀한 데이터 세트인 경우에는 둘 다 비슷
