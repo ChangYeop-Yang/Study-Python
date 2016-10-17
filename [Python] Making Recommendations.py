@@ -26,6 +26,7 @@ def sim_distance(prefs,person1,person2): # 구현하기 쉬운 장점이 있으�
   # Get the list of shared_items
   si={}
 
+  # Person1와 Person2가 같은 값을 가지고 있는 경우 Dictionary 생성
   for item in prefs[person1]: 
     if item in prefs[person2]: si[item]=1
 
@@ -47,6 +48,8 @@ def sim_distance(prefs,person1,person2): # 구현하기 쉬운 장점이 있으�
 def sim_pearson(prefs,p1,p2):
   # Get the list of mutually rated items
   si={}
+  
+  # Person1와 Person2가 같은 값을 가지고 있는 경우 Dictionary 생성 
   for item in prefs[p1]: 
     if item in prefs[p2]: si[item]=1
 
@@ -75,6 +78,7 @@ def sim_pearson(prefs,p1,p2):
 
   r=num/den
 
+  # 1: 완전연관 / 0 : 연관이 전혀 없음 / -1 : 완전히 반대로 연관
   return r
 
 
