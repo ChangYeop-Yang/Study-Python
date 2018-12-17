@@ -1,4 +1,4 @@
-# ■ Study-Python
+# ■ Study-Python <kbd>[Deagu University](https://www.daegu.ac.kr/mainl)</kbd>
 [Web Technology and Application] Personal Python Project. (Prof. 강신재)
 
 ## ★ Course Goals and Objectives
